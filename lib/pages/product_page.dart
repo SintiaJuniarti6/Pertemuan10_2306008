@@ -1,0 +1,175 @@
+import 'package:flutter/material.dart';
+import 'package:pertemuan10_2306008/models/product_model.dart';
+import 'package:pertemuan10_2306008/pages/product_detail_page.dart';
+import 'package:pertemuan10_2306008/widgets/product_cart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class ProductPage extends StatefulWidget {
+  const ProductPage({super.key});
+
+  @override
+  State<ProductPage> createState() => _ProductPageState();
+}
+
+class _ProductPageState extends State<ProductPage> {
+  List<ProductModel> products = [];
+  //method untuk menampilkan daftar produk
+  Future<void> loadProducts() async {
+    final res = await SharedPreferences.getInstance();
+    List<String> productList = res.getStringList('products') ?? [];
+    setState(() {
+      products = productList.reversed
+          .take(3)
+          .map((item) => ProductModel.fromJson(item))
+          .toList();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadProducts();
+  }
+
+  Future<void> saveProducts() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    List<String> productList = products.map((item) => item.toJson()).toList();
+    await prefs.setStringList('products', productList);
+  }
+
+  //add
+  Future<void> addProduct(ProductModel product) async {
+    setState(() {
+      products.add(product);
+    });
+    await saveProducts();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Produk berhasil ditambahkan")),
+    );
+  }
+
+  //update
+  Future<void> updateProduct(int index, ProductModel product) async {
+    setState(() {
+      products[index] = product;
+    });
+    await saveProducts();
+  }
+
+  //delete
+  Future<void> deleteProduct(int index) async {
+    setState(() {
+      products.removeAt(index);
+    });
+    await saveProducts();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Produk berhasil dihapus")));
+  }
+
+  void showForm({ProductModel? product, int? index}) {
+    TextEditingController nameController = TextEditingController(
+      text: product?.name ?? "",
+    );
+    TextEditingController descriptionController = TextEditingController(
+      text: product?.description ?? "",
+    );
+    TextEditingController priceController = TextEditingController(
+      text: product != null ? product.price.toString() : "",
+    );
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(product == null ? "Tambah Product" : "Edit Product"),
+        content: Column(
+          mainAxisSize: .min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(labelText: "Nama"),
+            ),
+            TextField(
+              controller: descriptionController,
+              decoration: InputDecoration(labelText: "Deskripsi"),
+            ),
+            TextField(
+              controller: priceController,
+              decoration: InputDecoration(labelText: "Harga"),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              final newProduct = ProductModel(
+                name: nameController.text,
+                description: descriptionController.text,
+                price: int.tryParse(priceController.text) ?? 0,
+              );
+              if (product == null) {
+                addProduct(newProduct);
+              } else {
+                updateProduct(index!, newProduct);
+              }
+            },
+            child: Text("Simpan"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Produk", style: TextStyle(color: Colors.white)),
+
+        backgroundColor: Colors.green,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Container(
+        margin: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => showForm(),
+                    child: const Text("Tambah Product"),
+                  ),
+                ),
+              ],
+            ),
+            Expanded(
+              child: products.isEmpty
+                  ? const Text("Belum Ada Produk")
+                  : ListView.builder(
+                      itemCount: products.length,
+                      itemBuilder: (context, index) {
+                        final product = products[index];
+
+                        return ProductCart(
+                          product: product, 
+                          onDelet: () => deleteProduct(index),
+                          onEdit: () => showForm(product: product,index: index),
+                          onTap: () => Navigator.push(
+                            context, 
+                            MaterialPageRoute(builder: (_) => ProductDetailPage(product: product)))
+                          );
+                      },
+                    ),
+            ),
+          ],
+        ), // Column
+      ), // Container
+    );
+  }
+}
